@@ -5,14 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [4.12.2] - 2020-06-10
 ### `jsonschema-generator`
-#### Changed
-- Cache looked-up getter in `FieldScope.findGetter()`
-- Cache looked-up field in `MethodScope.findGetterField()`
+#### Fixed
+- Performance: Cache looked-up getter in `FieldScope.findGetter()`
+- Performance: Cache looked-up field in `MethodScope.findGetterField()`
 
 ### `jsonschema-maven-plugin`
 #### Fixed
-- Clearer error message in case of package resolution finding no types to produce schemas for
+- Collecting all classes from a given `<packageName>` even if it contains classes whose super types are not included
 
 ## [4.12.1] - 2020-05-28
 ### `jsonschema-maven-plugin`
@@ -393,7 +395,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Indicate a number's "exclusiveMaximum" according to `@DecimalMax` or `@Negative`
 
 
-[Unreleased]: https://github.com/victools/jsonschema-generator/compare/v4.12.1...HEAD
+[Unreleased]: https://github.com/victools/jsonschema-generator/compare/v4.12.2...HEAD
+[4.12.2]: https://github.com/victools/jsonschema-generator/compare/v4.12.1...v4.12.2
 [4.12.1]: https://github.com/victools/jsonschema-generator/compare/v4.12.0...v4.12.1
 [4.12.0]: https://github.com/victools/jsonschema-generator/compare/v4.11.1...v4.12.0
 [4.11.1]: https://github.com/victools/jsonschema-generator/compare/v4.11.0...v4.11.1
