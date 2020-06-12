@@ -17,8 +17,11 @@
 package com.github.victools.jsonschema.module.jackson;
 
 import com.fasterxml.classmate.ResolvedType;
+import com.fasterxml.classmate.members.RawField;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonClassDescription;
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.JsonIdentityReference;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.fasterxml.jackson.databind.BeanDescription;
@@ -32,10 +35,13 @@ import com.github.victools.jsonschema.generator.SchemaGeneratorConfigBuilder;
 import com.github.victools.jsonschema.generator.SchemaGeneratorConfigPart;
 import com.github.victools.jsonschema.generator.SchemaGeneratorGeneralConfigPart;
 import com.github.victools.jsonschema.generator.TypeScope;
+import java.lang.annotation.Annotation;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -80,7 +86,8 @@ public class JacksonModule implements Module {
         SchemaGeneratorConfigPart<FieldScope> fieldConfigPart = builder.forFields();
         fieldConfigPart.withDescriptionResolver(this::resolveDescription)
                 .withPropertyNameOverrideResolver(this::getPropertyNameOverrideBasedOnJsonPropertyAnnotation)
-                .withIgnoreCheck(this::shouldIgnoreField);
+                .withIgnoreCheck(this::shouldIgnoreField)
+                .withTargetTypeOverridesResolver(this::resolveTargetType);
         SchemaGeneratorGeneralConfigPart generalConfigPart = builder.forTypesInGeneral();
         generalConfigPart.withDescriptionResolver(this::resolveDescriptionForType);
 
@@ -114,6 +121,47 @@ public class JacksonModule implements Module {
                 methodConfigPart.withCustomDefinitionProvider(subtypeResolver::provideCustomPropertySchemaDefinition);
             }
         }
+    }
+
+    private List<ResolvedType> resolveTargetType(FieldScope fieldScope) {
+        List<ResolvedType> result = null;
+        JsonIdentityReference jsonIdentifyReference =
+                fieldScope.getAnnotationConsideringFieldAndGetter(JsonIdentityReference.class);
+        if (jsonIdentifyReference != null && jsonIdentifyReference.alwaysAsId()) {
+            ResolvedType referencedType = fieldScope.getType();
+            ResolvedType typeWithAnnotation = getTypeWithAnnotation(referencedType, JsonIdentityInfo.class);
+            if (typeWithAnnotation != null) {
+                JsonIdentityInfo jsonIdentityInfo = typeWithAnnotation.getErasedType().getAnnotation(JsonIdentityInfo.class);
+                if (jsonIdentityInfo != null) {
+                    String idPropertyName = jsonIdentityInfo.property();
+                    Optional<RawField> idField = typeWithAnnotation.getMemberFields().stream()
+                            .filter(f -> f.getRawMember().getName().equals(idPropertyName)).findFirst();
+                    if (idField.isPresent()) {
+                        result = Arrays.asList(fieldScope.getContext().resolve(idField.get().getRawMember().getType()));
+                    }
+                }
+            }
+        }
+
+        return result; // Arrays.asList(targetType);
+    }
+
+    /**
+     * Find the first class in the class hierarchy that has the required annotation, when exists.
+     *
+     * @param resolvedType The type where the search has to start
+     * @param annotationClass The annotation that has to be found
+     * @return The class on which the annotation is defined, or null when not found
+     */
+    private ResolvedType getTypeWithAnnotation(ResolvedType resolvedType, Class<? extends Annotation> annotationClass) {
+        ResolvedType resultType = resolvedType;
+        while (resultType != null) {
+            if (resultType.getErasedType().getAnnotation(annotationClass) != null) {
+                return resultType;
+            }
+            resultType = resultType.getParentClass();
+        }
+        return null;
     }
 
     /**

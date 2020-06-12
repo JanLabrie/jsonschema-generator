@@ -16,10 +16,15 @@
 
 package com.github.victools.jsonschema.module.jackson;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonClassDescription;
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.JsonIdentityReference;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.victools.jsonschema.generator.OptionPreset;
@@ -27,54 +32,66 @@ import com.github.victools.jsonschema.generator.SchemaGenerator;
 import com.github.victools.jsonschema.generator.SchemaGeneratorConfig;
 import com.github.victools.jsonschema.generator.SchemaGeneratorConfigBuilder;
 import com.github.victools.jsonschema.generator.SchemaVersion;
+import junitparams.JUnitParamsRunner;
+import junitparams.Parameters;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.skyscreamer.jsonassert.JSONAssert;
+import org.skyscreamer.jsonassert.JSONCompareMode;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Scanner;
-import org.junit.Test;
-import org.skyscreamer.jsonassert.JSONAssert;
-import org.skyscreamer.jsonassert.JSONCompareMode;
+import java.util.Set;
 
 /**
  * Integration test of this module being used in a real SchemaGenerator instance.
  */
+@RunWith(JUnitParamsRunner.class)
 public class IntegrationTest {
 
-    /**
-     * Test
-     *
-     * @throws Exception
-     */
+    public Object[] parametersForGenerateAndCompare() {
+        return new Object[]{
+                new Object[]{TestBasicAnnotations.class, "integration-test-basic-annotations.json"},
+                new Object[]{TestBackReference.class, "integration-test-back-reference.json"},
+                new Object[]{TestIdentityReference.class, "integration-test-identity-reference.json"}
+        };
+    }
+
     @Test
-    public void testIntegration() throws Exception {
+    @Parameters
+    public void generateAndCompare(Class testClass, String schemaFileName) throws Exception {
         JacksonModule module = new JacksonModule(JacksonOption.FLATTENED_ENUMS_FROM_JSONVALUE, JacksonOption.FLATTENED_ENUMS_FROM_JSONPROPERTY);
         SchemaGeneratorConfig config = new SchemaGeneratorConfigBuilder(new ObjectMapper(), SchemaVersion.DRAFT_7, OptionPreset.PLAIN_JSON)
                 .with(module)
                 .build();
         SchemaGenerator generator = new SchemaGenerator(config);
-        JsonNode result = generator.generateSchema(TestClass.class);
+        JsonNode result = generator.generateSchema(testClass);
+        String generatedSchema = result.toString();
 
-        String rawJsonSchema = result.toString();
-        JSONAssert.assertEquals('\n' + rawJsonSchema + '\n',
-                loadResource("integration-test-result.json"), rawJsonSchema, JSONCompareMode.STRICT);
+        String expectedSchema = loadResource(schemaFileName);
+        JSONAssert.assertEquals('\n' + generatedSchema + '\n',
+                expectedSchema, generatedSchema, JSONCompareMode.STRICT);
     }
 
     private static String loadResource(String resourcePath) throws IOException {
         StringBuilder stringBuilder = new StringBuilder();
         try (InputStream inputStream = IntegrationTest.class
                 .getResourceAsStream(resourcePath);
-                Scanner scanner = new Scanner(inputStream, StandardCharsets.UTF_8.name())) {
+             Scanner scanner = new Scanner(inputStream, StandardCharsets.UTF_8.name())) {
             while (scanner.hasNext()) {
                 stringBuilder.append(scanner.nextLine()).append('\n');
             }
         }
-        String fileAsString = stringBuilder.toString();
-        return fileAsString;
 
+        return stringBuilder.toString();
     }
 
+    /**
+     * Test class for testing description, override and enum handling
+     */
     @JsonClassDescription("test description")
-    static class TestClass {
+    static class TestBasicAnnotations {
 
         @JsonPropertyDescription("field description")
         public String fieldWithDescription;
@@ -89,11 +106,11 @@ public class IntegrationTest {
         public TestEnumWithJsonPropertyAnnotations enumValueWithJsonPropertyAnnotations;
     }
 
-    static enum TestEnum {
-        A, B, C;
+    enum TestEnum {
+        A, B, C
     }
 
-    static enum TestEnumWithJsonValueAnnotation {
+    enum TestEnumWithJsonValueAnnotation {
         ENTRY1, ENTRY2, ENTRY3;
 
         @JsonValue
@@ -102,8 +119,34 @@ public class IntegrationTest {
         }
     }
 
-    static enum TestEnumWithJsonPropertyAnnotations {
+    enum TestEnumWithJsonPropertyAnnotations {
         @JsonProperty("x_property") X,
-        @JsonProperty Y;
+        @JsonProperty Y
     }
+
+    /**
+     * Test class to test the schema generation of @JsonBackReference fields
+     */
+    static class TestBackReference {
+        public String someField;
+
+        @JsonManagedReference
+        public Set<TestBackReference> children;
+
+        @JsonBackReference
+        public TestBackReference parent;
+    }
+
+    /**
+     * Test class to test the schema generation of @JsonIdentityReference fields
+     */
+    @JsonIdentityInfo(property = "id", generator = ObjectIdGenerators.PropertyGenerator.class)
+    static class TestIdentityReference {
+
+        public String id;
+
+        @JsonIdentityReference(alwaysAsId = true)
+        public TestIdentityReference other;
+    }
+
 }

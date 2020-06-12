@@ -226,7 +226,7 @@
                                 <encoding>UTF-8</encoding>
                                 <consoleOutput>true</consoleOutput>
                                 <logViolationsToConsole>true</logViolationsToConsole>
-                                <linkXRef>false</linkXRef>
+<!--                                <linkXRef>false</linkXRef>-->
                             </configuration>
                             <goals>
                                 <goal>check</goal>
